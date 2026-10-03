@@ -52,6 +52,8 @@ The source contains a sharp population drop from **2013-08-20 through 2013-10-14
 
 ## 🖥️ Open the dashboard
 
+🚀 **[Open the live DriveGuard dashboard](https://driveguard-7fm43sahmgdegzdja4caaq.streamlit.app/)**
+
 The Streamlit dashboard is a retrospective exploration tool, not a live connection. It has six views:
 
 1. **Fleet overview** — population, labels, model status, and headline operating metrics.
