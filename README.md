@@ -69,6 +69,8 @@ After installing the app dependencies and generating or obtaining the saved arti
 
 The app reads saved outputs; it does not train models at startup.
 
+For Vercel, this repository includes a separate static browser edition in [`web/`](web/README.md). The Vercel project root is `web`; that edition keeps the six-view dashboard interaction without launching a persistent Streamlit server.
+
 ## ♻️ Reproduce the work
 
 ### Environment
@@ -109,6 +111,7 @@ py -3.14 -m pip --python .venv\Scripts\python.exe install -r requirements-test.t
 |---|---|
 | `src/driveguard/` | Ingestion, censor-aware labels, features, training, evaluation, audit, analysis, and explanations |
 | `app/streamlit_app.py` | Six-view interactive dashboard |
+| `web/` | Vercel static dashboard and compact data-package builder |
 | `config.example.yaml` | Reproducible model and split settings; copy to ignored `config.yaml` |
 | `docs/data_dictionary.md` | Feature and label definitions |
 | `docs/demo_walkthrough.md` | Dashboard walkthrough and rebuild notes |
