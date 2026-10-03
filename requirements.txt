@@ -1,0 +1,7 @@
+duckdb>=1.1,<2
+pandas>=2.2,<4
+pyarrow>=18,<25
+scikit-learn>=1.5,<2
+matplotlib>=3.9,<4
+PyYAML>=6,<7
+joblib>=1.4,<2

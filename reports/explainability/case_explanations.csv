@@ -1,0 +1,4 @@
+case_type,serial_number,observation_date,failure_date,label,xgboost_score,threshold,top_feature_1,top_feature_2,top_feature_3,top_feature_4,top_feature_5
+detected_failure,S1F05N7X,2013-11-09 00:00:00,2013-11-14 00:00:00,1,0.4914450943470001,0.012663088738918304,numeric__smart_5_std_30d,numeric__smart_197_raw_num,numeric__smart_9_mean_30d,numeric__smart_5_std_7d,numeric__smart_5_raw_num
+missed_failure,Z300WWF9,2013-11-13 00:00:00,2013-12-03 00:00:00,1,0.003520645434036851,0.012663088738918304,numeric__smart_5_max_30d,numeric__smart_9_mean_30d,numeric__smart_5_raw_num,numeric__smart_5_std_30d,model__model_ST1500DL003
+false_alarm,S1F0LDS2,2013-11-21 00:00:00,NaT,0,0.1467261016368866,0.012663088738918304,numeric__smart_5_std_30d,numeric__smart_9_mean_30d,numeric__smart_5_std_7d,numeric__smart_5_raw_num,numeric__smart_5_max_30d

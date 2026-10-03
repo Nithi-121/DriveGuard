@@ -1,0 +1,105 @@
+{
+  "generated_at_utc": "2026-10-03T06:11:48.911178+00:00",
+  "python_version": "3.14.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "packages": {
+    "duckdb": "1.5.6",
+    "pandas": "3.0.6",
+    "pyarrow": "24.0.0",
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.4.1",
+    "shap": "0.52.0",
+    "streamlit": "1.64.0",
+    "plotly": "6.9.0",
+    "matplotlib": "3.11.2",
+    "PyYAML": "6.0.3"
+  },
+  "random_seed": 42,
+  "label_horizon_days": 30,
+  "temporal_split": {
+    "train_end": "2013-07-31",
+    "validation_start": "2013-07-31",
+    "validation_end": "2013-09-17",
+    "test_start": "2013-10-15",
+    "test_end": "2013-12-31",
+    "embargo_days": 30
+  },
+  "source_data_manifest": [
+    {
+      "year": "2013",
+      "source": "Backblaze Drive Stats",
+      "archive_url": "https://f001.backblazeb2.com/file/Backblaze-Hard-Drive-Data/data_2013.zip",
+      "download_date": "2026-10-01",
+      "archive_bytes": "80983520",
+      "extracted_csv_count": "266",
+      "extracted_csv_bytes": "774633248"
+    }
+  ],
+  "artifacts": {
+    "config.yaml": {
+      "bytes": 372,
+      "sha256": "7e0c336683c15376fe074a3792776611f18d4626ac57bc8dddd340a5bd6c20a8"
+    },
+    "requirements-lock.txt": {
+      "bytes": 1129,
+      "sha256": "cd4de8d6cd3af20043a5847e56d6dfce272af599a6716eac21eeed361db3c282"
+    },
+    "data/manifest.csv": {
+      "bytes": 257,
+      "sha256": "44a07a9f90529dcef26973573184c0d9f6414e03b5545b22a39e9efdfdbde10f"
+    },
+    "reports/model_evaluation/metrics.json": {
+      "bytes": 5748,
+      "sha256": "f43beb6329b50205b87191197560564c25e39d2beeb9ff5254b1036b46249833"
+    },
+    "reports/model_evaluation/isolation_forest_metrics.json": {
+      "bytes": 1924,
+      "sha256": "3d9d7c6350e1fe732c2e64296de89dd9306c1d7b5c424d6126a65a119615773a"
+    },
+    "reports/analysis/analysis_summary.json": {
+      "bytes": 2935,
+      "sha256": "7e96f7885ca4dfcdfe3f579cad467c70aa9afadec69376e9e8c309c09ca12b25"
+    },
+    "models/logistic_regression.joblib": {
+      "bytes": 9107,
+      "sha256": "942e4468b34aa67ff1130a302aa2ae811a2b945323fe600f35e0b4d76f266d38"
+    },
+    "models/xgboost.joblib": {
+      "bytes": 89424,
+      "sha256": "0d3bf0d84c016518d212414de07fe81a2b8bc55fc4a6348dcfc3620c124df00d"
+    },
+    "models/isolation_forest.joblib": {
+      "bytes": 658929,
+      "sha256": "e713532c3c1e1aa48a0234f1c69be99081a3c3b81d7e830359518b07c3e12a3d"
+    },
+    "reports/model_evaluation/test_predictions.parquet": {
+      "bytes": 10130257,
+      "sha256": "31cdc9e120e027477bd7568504412a3cc168d5ee1d31219fbbd5d315cf7114c6"
+    },
+    "reports/model_evaluation/isolation_forest_test_predictions.parquet": {
+      "bytes": 10406330,
+      "sha256": "e584a3b022f7d0f3fd3a1eb2e7df63a2f1af56f6a336760ae7d02661ff10d542"
+    },
+    "reports/model_evaluation/test_predictions_sample.parquet": {
+      "bytes": 374888,
+      "sha256": "2305f39d2f6a809c64892e48870c3fdd9c28b11dcf41634043665114d80a998e"
+    }
+  },
+  "storage": {
+    "project_budget_gb_decimal": 5.0,
+    "full_project_bytes_including_venv_and_cache": 2974286915,
+    "data_and_outputs_bytes_excluding_venv_and_cache": 1900234767
+  },
+  "rebuild_order": [
+    "ingest",
+    "labels",
+    "features",
+    "eda",
+    "train",
+    "anomaly",
+    "analyze_errors",
+    "score_sample",
+    "explain",
+    "streamlit app"
+  ]
+}

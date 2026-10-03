@@ -1,0 +1,75 @@
+{
+  "test_rows": 1235875,
+  "test_prevalence": 0.004987559421462526,
+  "models": {
+    "logistic_regression": {
+      "brier_score": 0.004902376010913312,
+      "expected_calibration_error_10_quantile_bins": 0.00204260285452996,
+      "threshold_selected_on_validation": 0.021862037526121952,
+      "drive_cluster_bootstrap_95pct": {
+        "resampling_unit": "serial_number (drive cluster)",
+        "replicates": 300,
+        "seed": 42,
+        "unique_drives": 26812,
+        "intervals": {
+          "precision": {
+            "lower_95": 0.10293088964363092,
+            "upper_95": 0.15929598346543297
+          },
+          "recall": {
+            "lower_95": 0.18589437008350754,
+            "upper_95": 0.2725214941305463
+          },
+          "false_positive_rate": {
+            "lower_95": 0.006842275649469653,
+            "upper_95": 0.008707122570486354
+          },
+          "alerts_per_1000_drive_days": {
+            "lower_95": 7.898521363218776,
+            "upper_95": 9.83350957068571
+          },
+          "failure_event_recall": {
+            "lower_95": 0.32837300731281144,
+            "upper_95": 0.43459880152002334
+          }
+        }
+      }
+    },
+    "xgboost": {
+      "brier_score": 0.004709028771349461,
+      "expected_calibration_error_10_quantile_bins": 0.004887765468616587,
+      "threshold_selected_on_validation": 0.012663088738918304,
+      "drive_cluster_bootstrap_95pct": {
+        "resampling_unit": "serial_number (drive cluster)",
+        "replicates": 300,
+        "seed": 42,
+        "unique_drives": 26812,
+        "intervals": {
+          "precision": {
+            "lower_95": 0.12828044353774667,
+            "upper_95": 0.18048303254820688
+          },
+          "recall": {
+            "lower_95": 0.31034377400462815,
+            "upper_95": 0.41068932825319254
+          },
+          "false_positive_rate": {
+            "lower_95": 0.009093466619235399,
+            "upper_95": 0.011059163379547916
+          },
+          "alerts_per_1000_drive_days": {
+            "lower_95": 10.718305238150695,
+            "upper_95": 12.994397736935667
+          },
+          "failure_event_recall": {
+            "lower_95": 0.3944354596058372,
+            "upper_95": 0.5025493798805696
+          }
+        }
+      }
+    }
+  },
+  "thresholds_note": "All thresholds were selected on validation; test slices are diagnostic only.",
+  "calibration_note": "Calibration is measured on the natural-prevalence test set. Models were fit with sampled healthy training rows and inverse sampling weights; probability calibration may still require a separate validation-fitted calibrator before deployment.",
+  "uncertainty_note": "Percentile intervals resample whole serial-number clusters and quantify sampling variation across drives in this test period; they do not account for temporal or dataset-source shift."
+}

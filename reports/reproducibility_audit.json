@@ -1,0 +1,480 @@
+{
+  "passed": true,
+  "score_tolerance": 1e-08,
+  "checks": {
+    "drive_days.parquet_rows": {
+      "reference": 5091501,
+      "rebuilt": 5091501,
+      "match": true
+    },
+    "labeled.parquet_rows": {
+      "reference": 5090777,
+      "rebuilt": 5090777,
+      "match": true
+    },
+    "features.parquet_rows": {
+      "reference": 4261871,
+      "rebuilt": 4261871,
+      "match": true
+    },
+    "label_status_counts": {
+      "reference": {
+        "insufficient_followup": 828906,
+        "positive": 18021,
+        "negative": 4188162,
+        "negative_before_later_failure": 55688
+      },
+      "rebuilt": {
+        "positive": 18021,
+        "negative": 4188162,
+        "insufficient_followup": 828906,
+        "negative_before_later_failure": 55688
+      },
+      "match": true
+    },
+    "feature_schema": {
+      "reference_columns": [
+        [
+          "date",
+          "VARCHAR"
+        ],
+        [
+          "obs_date",
+          "DATE"
+        ],
+        [
+          "serial_number",
+          "VARCHAR"
+        ],
+        [
+          "filename",
+          "VARCHAR"
+        ],
+        [
+          "model",
+          "VARCHAR"
+        ],
+        [
+          "capacity_bytes",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_raw_num",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_missing",
+          "INTEGER"
+        ],
+        [
+          "smart_9_raw_num",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_missing",
+          "INTEGER"
+        ],
+        [
+          "smart_194_raw_num",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_missing",
+          "INTEGER"
+        ],
+        [
+          "smart_197_raw_num",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_missing",
+          "INTEGER"
+        ],
+        [
+          "smart_5_mean_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_max_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_std_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_count_7d",
+          "BIGINT"
+        ],
+        [
+          "smart_5_mean_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_max_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_std_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_count_30d",
+          "BIGINT"
+        ],
+        [
+          "smart_9_mean_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_max_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_std_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_count_7d",
+          "BIGINT"
+        ],
+        [
+          "smart_9_mean_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_max_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_std_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_count_30d",
+          "BIGINT"
+        ],
+        [
+          "smart_194_mean_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_max_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_std_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_count_7d",
+          "BIGINT"
+        ],
+        [
+          "smart_194_mean_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_max_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_std_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_count_30d",
+          "BIGINT"
+        ],
+        [
+          "smart_197_mean_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_max_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_std_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_count_7d",
+          "BIGINT"
+        ],
+        [
+          "smart_197_mean_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_max_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_std_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_count_30d",
+          "BIGINT"
+        ],
+        [
+          "smart_5_change",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_change",
+          "DOUBLE"
+        ],
+        [
+          "failure_date",
+          "DATE"
+        ],
+        [
+          "will_fail_30d",
+          "INTEGER"
+        ],
+        [
+          "label_status",
+          "VARCHAR"
+        ]
+      ],
+      "rebuilt_columns": [
+        [
+          "date",
+          "VARCHAR"
+        ],
+        [
+          "obs_date",
+          "DATE"
+        ],
+        [
+          "serial_number",
+          "VARCHAR"
+        ],
+        [
+          "filename",
+          "VARCHAR"
+        ],
+        [
+          "model",
+          "VARCHAR"
+        ],
+        [
+          "capacity_bytes",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_raw_num",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_missing",
+          "INTEGER"
+        ],
+        [
+          "smart_9_raw_num",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_missing",
+          "INTEGER"
+        ],
+        [
+          "smart_194_raw_num",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_missing",
+          "INTEGER"
+        ],
+        [
+          "smart_197_raw_num",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_missing",
+          "INTEGER"
+        ],
+        [
+          "smart_5_mean_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_max_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_std_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_count_7d",
+          "BIGINT"
+        ],
+        [
+          "smart_5_mean_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_max_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_std_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_5_count_30d",
+          "BIGINT"
+        ],
+        [
+          "smart_9_mean_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_max_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_std_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_count_7d",
+          "BIGINT"
+        ],
+        [
+          "smart_9_mean_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_max_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_std_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_9_count_30d",
+          "BIGINT"
+        ],
+        [
+          "smart_194_mean_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_max_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_std_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_count_7d",
+          "BIGINT"
+        ],
+        [
+          "smart_194_mean_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_max_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_std_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_194_count_30d",
+          "BIGINT"
+        ],
+        [
+          "smart_197_mean_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_max_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_std_7d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_count_7d",
+          "BIGINT"
+        ],
+        [
+          "smart_197_mean_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_max_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_std_30d",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_count_30d",
+          "BIGINT"
+        ],
+        [
+          "smart_5_change",
+          "DOUBLE"
+        ],
+        [
+          "smart_197_change",
+          "DOUBLE"
+        ],
+        [
+          "failure_date",
+          "DATE"
+        ],
+        [
+          "will_fail_30d",
+          "INTEGER"
+        ],
+        [
+          "label_status",
+          "VARCHAR"
+        ]
+      ],
+      "match": true
+    },
+    "feature_values_sample": {
+      "sample_mod": 100,
+      "reference_sample_rows": 42524,
+      "rebuilt_sample_rows": 42524,
+      "matched_sample_rows": 42524,
+      "excluded_provenance_columns": [
+        "filename"
+      ],
+      "mismatched_values_by_column": {},
+      "match": true
+    },
+    "holdout_metrics": {
+      "comparison_count": 96,
+      "mismatches": [],
+      "match": true
+    },
+    "full_test_predictions": {
+      "reference_rows": 1235875,
+      "rebuilt_rows": 1235875,
+      "missing_keys": 0,
+      "extra_keys": 0,
+      "rows": 1235875.0,
+      "label_mismatches": 0.0,
+      "score_mismatch_rows": 0.0,
+      "risk_logistic_regression_max_abs_diff": 1.0408340855860843e-17,
+      "risk_xgboost_max_abs_diff": 0.0,
+      "risk_sector_count_rule_max_abs_diff": 0.0,
+      "match": true
+    }
+  }
+}

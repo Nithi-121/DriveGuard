@@ -1,0 +1,158 @@
+{
+  "horizon_days": 30,
+  "split": {
+    "train_end": "2013-07-31",
+    "validation_start": "2013-07-31",
+    "validation_end": "2013-09-17",
+    "test_start": "2013-10-15",
+    "test_end": "2013-12-31",
+    "embargo_days": 30
+  },
+  "train_rows_sampled": 194530,
+  "train_positive_rows": 7329,
+  "healthy_sample_fraction": 0.1,
+  "training": {
+    "healthy_sample_fraction": 0.1,
+    "healthy_sample_weight": 10.0,
+    "split": {
+      "train_end": "2013-07-31",
+      "validation_start": "2013-07-31",
+      "validation_end": "2013-09-17",
+      "test_start": "2013-10-15",
+      "test_end": "2013-12-31",
+      "embargo_days": 30
+    },
+    "train_rows_sampled": 194530,
+    "train_positive_rows": 7329,
+    "logistic_solver": "liblinear",
+    "logistic_max_iter": 80,
+    "xgboost_best_iteration": 2,
+    "xgboost_n_estimators": 180
+  },
+  "validation": {
+    "start": "2013-07-31",
+    "last_day_exclusive": "2013-08-18",
+    "rows": 422185
+  },
+  "test": {
+    "start": "2013-10-15",
+    "last_day_inclusive": "2013-12-01",
+    "rows": 1235875
+  },
+  "models": {
+    "logistic_regression": {
+      "validation": {
+        "rows": 422185,
+        "positive_rows": 437,
+        "prevalence": 0.0010350912514655898,
+        "average_precision": 0.029838131010757267,
+        "threshold_selected_on_validation_at_max_1pct_fpr": 0.021862037526121952,
+        "recall": 0.34782608695652173,
+        "precision": 0.03479056992446784,
+        "false_positive_rate": 0.00999886187960583,
+        "alerts_per_1000_drive_days": 10.348543884789844,
+        "true_positives": 152,
+        "false_positives": 4217,
+        "false_negatives": 285,
+        "true_negatives": 417531,
+        "failure_events_with_any_alert_recall": 0.5102040816326531,
+        "eligible_failure_events": 49,
+        "median_lead_days_detected_events": 6.0
+      },
+      "test": {
+        "rows": 1235875,
+        "positive_rows": 6164,
+        "prevalence": 0.004987559421462526,
+        "average_precision": 0.09593774077454968,
+        "threshold_selected_on_validation_at_max_1pct_fpr": 0.021862037526121952,
+        "recall": 0.22793640493186243,
+        "precision": 0.1282987854990412,
+        "false_positive_rate": 0.0077627995520898815,
+        "alerts_per_1000_drive_days": 8.86092849195914,
+        "true_positives": 1405,
+        "false_positives": 9546,
+        "false_negatives": 4759,
+        "true_negatives": 1220165,
+        "failure_events_with_any_alert_recall": 0.38436482084690554,
+        "eligible_failure_events": 307,
+        "median_lead_days_detected_events": 19.5
+      }
+    },
+    "xgboost": {
+      "validation": {
+        "rows": 422185,
+        "positive_rows": 437,
+        "prevalence": 0.0010350912514655898,
+        "average_precision": 0.048775674551249655,
+        "threshold_selected_on_validation_at_max_1pct_fpr": 0.012663088738918304,
+        "recall": 0.38672768878718533,
+        "precision": 0.04089039438664408,
+        "false_positive_rate": 0.009398977588512571,
+        "alerts_per_1000_drive_days": 9.789547236401104,
+        "true_positives": 169,
+        "false_positives": 3964,
+        "false_negatives": 268,
+        "true_negatives": 417784,
+        "failure_events_with_any_alert_recall": 0.4897959183673469,
+        "eligible_failure_events": 49,
+        "median_lead_days_detected_events": 6.0
+      },
+      "test": {
+        "rows": 1235875,
+        "positive_rows": 6164,
+        "prevalence": 0.004987559421462526,
+        "average_precision": 0.11976577595592355,
+        "threshold_selected_on_validation_at_max_1pct_fpr": 0.012663088738918304,
+        "recall": 0.3601557430240104,
+        "precision": 0.15383549303582567,
+        "false_positive_rate": 0.009929975416988219,
+        "alerts_per_1000_drive_days": 11.676747243855568,
+        "true_positives": 2220,
+        "false_positives": 12211,
+        "false_negatives": 3944,
+        "true_negatives": 1217500,
+        "failure_events_with_any_alert_recall": 0.4495114006514658,
+        "eligible_failure_events": 307,
+        "median_lead_days_detected_events": 24.0
+      }
+    },
+    "sector_count_rule": {
+      "validation": {
+        "rows": 422185,
+        "positive_rows": 437,
+        "prevalence": 0.0010350912514655898,
+        "average_precision": 0.01728505043892714,
+        "threshold_selected_on_validation_at_max_1pct_fpr": 5.5909869805108565,
+        "recall": 0.2837528604118993,
+        "precision": 0.02871699861046781,
+        "false_positive_rate": 0.009944326944051899,
+        "alerts_per_1000_drive_days": 10.22774376162109,
+        "true_positives": 124,
+        "false_positives": 4194,
+        "false_negatives": 313,
+        "true_negatives": 417554,
+        "failure_events_with_any_alert_recall": 0.3673469387755102,
+        "eligible_failure_events": 49,
+        "median_lead_days_detected_events": 6.0
+      },
+      "test": {
+        "rows": 1235875,
+        "positive_rows": 6164,
+        "prevalence": 0.004987559421462526,
+        "average_precision": 0.1252738682453956,
+        "threshold_selected_on_validation_at_max_1pct_fpr": 5.5909869805108565,
+        "recall": 0.3494484101232966,
+        "precision": 0.13369747377568122,
+        "false_positive_rate": 0.011349821218156135,
+        "alerts_per_1000_drive_days": 13.036108020633154,
+        "true_positives": 2154,
+        "false_positives": 13957,
+        "false_negatives": 4010,
+        "true_negatives": 1215754,
+        "failure_events_with_any_alert_recall": 0.40716612377850164,
+        "eligible_failure_events": 307,
+        "median_lead_days_detected_events": 28.0
+      }
+    }
+  }
+}

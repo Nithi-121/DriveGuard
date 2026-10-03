@@ -1,0 +1,16 @@
+paths:
+  raw: data/raw
+  processed: data/processed
+  reports: reports
+  models: models
+label:
+  horizon_days: 30
+split:
+  # 2013 data: 30-day label embargoes plus an added gap around a population drop.
+  train_end: "2013-07-31"
+  validation_start: "2013-07-31"
+  validation_end: "2013-09-17"
+  test_start: "2013-10-15"
+  test_end: "2013-12-31"
+  embargo_days: 30
+seed: 42
