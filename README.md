@@ -64,15 +64,7 @@ The model is a retrospective study of 2013 data. The dashboard also retrieves Ba
 6. **Why this score** — global and local feature explanations.
 7. **Data quality** — calibration, uncertainty, and error-slice context.
 
-To load drive-level records from the latest published quarter, add Backblaze's public read-only Iceberg credentials in Streamlit Community Cloud under **Manage app → Settings → Secrets**:
-
-```toml
-[backblaze]
-key_id = "<Backblaze public read-only key ID>"
-application_key = "<Backblaze public read-only application key>"
-```
-
-Backblaze documents the credentials and dataset details on its [Drive Stats page](https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data). The Streamlit app does not store or expose these values in GitHub.
+The latest-fleet view reads the last daily CSV from Backblaze's public quarterly ZIP archive using HTTP byte-range requests, so it fetches only that compressed day rather than unpacking the multi-gigabyte quarter. The latest daily rows are not scored by the 2013 model. See [Backblaze Drive Stats](https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data) for source and release cadence.
 
 After installing the app dependencies and generating or obtaining the saved artifacts described below, run:
 

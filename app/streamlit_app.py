@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import io
 import re
 from html import unescape
 from html.parser import HTMLParser
+from collections import OrderedDict
 from pathlib import Path
+import zipfile
 from urllib.request import Request, urlopen
 
 import numpy as np
@@ -14,8 +17,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-import duckdb
-from datetime import date, timedelta
+from datetime import date
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +28,6 @@ SAMPLE_PATH = REPORTS / "model_evaluation" / "test_predictions_sample.parquet"
 ANOMALY_PATH = REPORTS / "model_evaluation" / "isolation_forest_metrics.json"
 EXPLAIN_PATH = REPORTS / "explainability"
 BACKBLAZE_STATS_URL = "https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data"
-BACKBLAZE_ICEBERG_URI = "s3://drivestats-iceberg/drivestats"
 
 st.set_page_config(
     page_title="DriveGuard | Fleet intelligence",
@@ -134,6 +135,83 @@ class _PageText(HTMLParser):
             self.parts.append(text)
 
 
+class _HttpRangeReader(io.RawIOBase):
+    """Seekable view of a public ZIP archive, fetching only requested byte ranges."""
+
+    def __init__(self, url: str, *, block_size: int = 1 << 20, cached_blocks: int = 8) -> None:
+        super().__init__()
+        self.url = url
+        self.position = 0
+        self.block_size = block_size
+        self.cached_blocks = cached_blocks
+        self.blocks: OrderedDict[int, bytes] = OrderedDict()
+        request = Request(url, method="HEAD", headers={"User-Agent": "DriveGuard-portfolio-dashboard/1.0"})
+        with urlopen(request, timeout=30) as response:
+            self.size = int(response.headers["Content-Length"])
+            if response.headers.get("Accept-Ranges", "").lower() != "bytes":
+                raise OSError("The Backblaze archive does not support byte-range reads.")
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self.position
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        target = offset if whence == io.SEEK_SET else self.position + offset if whence == io.SEEK_CUR else self.size + offset
+        if target < 0:
+            raise ValueError("Cannot seek before the start of the Backblaze archive.")
+        self.position = target
+        return self.position
+
+    def _read_block(self, block_number: int) -> bytes:
+        if block_number in self.blocks:
+            self.blocks.move_to_end(block_number)
+            return self.blocks[block_number]
+        start = block_number * self.block_size
+        end = min(self.size, start + self.block_size) - 1
+        request = Request(
+            self.url,
+            headers={
+                "Range": f"bytes={start}-{end}",
+                "User-Agent": "DriveGuard-portfolio-dashboard/1.0",
+            },
+        )
+        with urlopen(request, timeout=30) as response:
+            if response.status != 206:
+                raise OSError("Backblaze did not honor a byte-range request.")
+            data = response.read()
+        if len(data) != end - start + 1:
+            raise OSError("Backblaze returned an incomplete archive range.")
+        self.blocks[block_number] = data
+        while len(self.blocks) > self.cached_blocks:
+            self.blocks.popitem(last=False)
+        return data
+
+    def read(self, size: int = -1) -> bytes:
+        if size is None or size < 0:
+            raise OSError("Unbounded archive reads are disabled.")
+        remaining = min(size, max(0, self.size - self.position))
+        chunks: list[bytes] = []
+        while remaining:
+            block_number = self.position // self.block_size
+            block_offset = self.position % self.block_size
+            block = self._read_block(block_number)
+            count = min(remaining, len(block) - block_offset)
+            chunks.append(block[block_offset : block_offset + count])
+            self.position += count
+            remaining -= count
+        return b"".join(chunks)
+
+    def readinto(self, buffer: bytearray) -> int:
+        data = self.read(len(buffer))
+        buffer[: len(data)] = data
+        return len(data)
+
+
 @st.cache_data(ttl=6 * 60 * 60, show_spinner=False)
 def load_latest_backblaze_snapshot() -> dict:
     """Read the latest aggregate published snapshot from Backblaze's data page."""
@@ -178,64 +256,33 @@ def load_latest_backblaze_snapshot() -> dict:
 
 @st.cache_data(ttl=6 * 60 * 60, show_spinner=False)
 def load_latest_backblaze_records(quarter: str) -> tuple[pd.DataFrame, date]:
-    """Query the final daily drive-level snapshot in Backblaze's latest quarter."""
+    """Read the final CSV entry of Backblaze's quarterly ZIP using HTTP range requests."""
     match = re.fullmatch(r"Q([1-4]) (20\d{2})", quarter)
     if not match:
         raise ValueError(f"Unexpected Backblaze quarter: {quarter}")
     quarter_number, year = int(match.group(1)), int(match.group(2))
-    month = (quarter_number - 1) * 3 + 1
-    start = date(year, month, 1)
-    end = date(year + 1, 1, 1) if month == 10 else date(year, month + 3, 1)
-    credentials = st.secrets.get("backblaze", {})
-    key_id = credentials.get("key_id")
-    application_key = credentials.get("application_key")
-    if not key_id or not application_key:
-        raise ValueError("Backblaze read-only credentials are not configured in Streamlit app secrets.")
+    archive_url = f"https://f001.backblazeb2.com/file/Backblaze-Hard-Drive-Data/data_Q{quarter_number}_{year}.zip"
+    prefix = f"data_Q{quarter_number}_{year}/"
+    columns = [
+        "date", "serial_number", "model", "capacity_bytes", "failure",
+        "smart_5_raw", "smart_9_raw", "smart_187_raw", "smart_188_raw",
+        "smart_194_raw", "smart_197_raw", "smart_198_raw",
+    ]
 
-    connection = duckdb.connect()
-    try:
-        connection.execute("INSTALL httpfs")
-        connection.execute("LOAD httpfs")
-        connection.execute("INSTALL iceberg")
-        connection.execute("LOAD iceberg")
-        connection.execute("SET unsafe_enable_version_guessing = true")
-        connection.execute(
-            """CREATE SECRET backblaze_public_read (
-                TYPE s3,
-                KEY_ID ?,
-                SECRET ?,
-                REGION 'us-west-004',
-                ENDPOINT 's3.us-west-004.backblazeb2.com'
-            )""",
-            [key_id, application_key],
+    with zipfile.ZipFile(_HttpRangeReader(archive_url)) as archive:
+        members = sorted(
+            name for name in archive.namelist()
+            if name.startswith(prefix) and re.search(r"/20\d{2}-\d{2}-\d{2}\.csv$", name)
         )
-        source = "iceberg_scan(?, version='?', allow_moved_paths=true)"
-        latest_date = end - timedelta(days=1)
-
-        columns = [
-            "date", "serial_number", "model", "capacity_bytes", "failure",
-            "smart_5_raw", "smart_9_raw", "smart_187_raw", "smart_188_raw",
-            "smart_194_raw", "smart_197_raw", "smart_198_raw",
-        ]
-        frame = connection.execute(
-            f"SELECT {', '.join(columns)} FROM {source} WHERE date = ?",
-            [BACKBLAZE_ICEBERG_URI, latest_date],
-        ).fetchdf()
-        if frame.empty:
-            latest_date = connection.execute(
-                f"SELECT MAX(date) FROM {source} WHERE date >= ? AND date < ?",
-                [BACKBLAZE_ICEBERG_URI, start, end],
-            ).fetchone()[0]
-            if latest_date is None:
-                raise ValueError(f"No Backblaze daily records were found for {quarter}.")
-            frame = connection.execute(
-                f"SELECT {', '.join(columns)} FROM {source} WHERE date = ?",
-                [BACKBLAZE_ICEBERG_URI, latest_date],
-            ).fetchdf()
-        frame["failure"] = frame["failure"].fillna(0).astype(bool)
-        return frame, latest_date
-    finally:
-        connection.close()
+        if not members:
+            raise ValueError(f"No daily CSV files were found in the {quarter} archive.")
+        member = members[-1]
+        latest_date = date.fromisoformat(Path(member).stem)
+        with archive.open(member) as csv_file:
+            frame = pd.read_csv(csv_file, usecols=columns)
+    frame["date"] = pd.to_datetime(frame["date"])
+    frame["failure"] = frame["failure"].fillna(0).astype(bool)
+    return frame, latest_date
 
 
 def icon_header(icon: str, title: str, subtitle: str = "") -> None:
@@ -463,12 +510,9 @@ with tab_live:
         )
     except Exception as exc:
         st.error("The latest per-drive snapshot could not be loaded. The historical model dashboard remains available.")
-        if "not configured in Streamlit app secrets" in str(exc):
-            st.info("To enable the 2026 drive rows, add Backblaze's public read-only Iceberg credentials in Streamlit Cloud → Manage app → Settings → Secrets. See the README for the required TOML fields.")
-        else:
-            st.caption(f"Backblaze source request failed ({type(exc).__name__}). Try again after the source is reachable.")
+        st.caption(f"Backblaze source request failed ({type(exc).__name__}). Try again after the source is reachable.")
     st.markdown(f"[Open Backblaze’s official Drive Stats page ↗]({BACKBLAZE_STATS_URL})")
-    st.caption("The dashboard reads Backblaze's public read-only Iceberg table and refreshes its cached data every six hours. New snapshot dates appear after Backblaze publishes a quarterly update.")
+    st.caption("The dashboard reads the latest daily CSV from Backblaze's public quarterly archive using HTTP byte ranges; it fetches only that day’s compressed file, not the full archive. Results are cached for six hours.")
 
 with tab_risk:
     icon_header("⌁", "Historical risk explorer", "Complete-test operating view")
