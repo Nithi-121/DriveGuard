@@ -54,14 +54,15 @@ The source contains a sharp population drop from **2013-08-20 through 2013-10-14
 
 🚀 **[Open the live DriveGuard dashboard](https://driveguard-7fm43sahmgdegzdja4caaq.streamlit.app/)**
 
-The Streamlit dashboard is a retrospective exploration tool, not a live connection. It has six views:
+The model is a retrospective study of 2013 data. The dashboard also retrieves Backblaze's latest published fleet snapshot (quarterly, not real time); it does not connect to your own drives. It has seven views:
 
 1. **Fleet overview** — population, labels, model status, and headline operating metrics.
-2. **Risk explorer** — filter and inspect ranked drive-day observations.
-3. **Drive detail** — review a drive's history and score trajectory.
-4. **Model lab** — compare the baselines and their alert trade-offs.
-5. **Why this score** — global and local feature explanations.
-6. **Data quality** — calibration, uncertainty, and error-slice context.
+2. **Latest fleet data** — current published Backblaze aggregate counts and quarterly AFR, clearly separated from model results.
+3. **Risk explorer** — filter and inspect ranked drive-day observations.
+4. **Drive detail** — review a drive's history and score trajectory.
+5. **Model lab** — compare the baselines and their alert trade-offs.
+6. **Why this score** — global and local feature explanations.
+7. **Data quality** — calibration, uncertainty, and error-slice context.
 
 After installing the app dependencies and generating or obtaining the saved artifacts described below, run:
 

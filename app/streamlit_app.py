@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
+from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 import numpy as np
 import pandas as pd
@@ -19,6 +23,7 @@ PREDICTIONS_PATH = REPORTS / "model_evaluation" / "test_predictions.parquet"
 SAMPLE_PATH = REPORTS / "model_evaluation" / "test_predictions_sample.parquet"
 ANOMALY_PATH = REPORTS / "model_evaluation" / "isolation_forest_metrics.json"
 EXPLAIN_PATH = REPORTS / "explainability"
+BACKBLAZE_STATS_URL = "https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data"
 
 st.set_page_config(
     page_title="DriveGuard | Fleet intelligence",
@@ -113,6 +118,61 @@ def load_sample(path: str) -> pd.DataFrame:
     return frame
 
 
+class _PageText(HTMLParser):
+    """Collect readable page text without adding a scraping dependency."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        text = data.strip()
+        if text:
+            self.parts.append(text)
+
+
+@st.cache_data(ttl=6 * 60 * 60, show_spinner=False)
+def load_latest_backblaze_snapshot() -> dict:
+    """Read the latest aggregate published snapshot from Backblaze's data page."""
+    request = Request(
+        BACKBLAZE_STATS_URL,
+        headers={"User-Agent": "DriveGuard-portfolio-dashboard/1.0"},
+    )
+    with urlopen(request, timeout=12) as response:
+        html = response.read(8_000_000).decode("utf-8", errors="replace")
+    parser = _PageText()
+    parser.feed(html)
+    text = re.sub(r"\s+", " ", unescape(" ".join(parser.parts)))
+
+    period = re.search(r"Drive Stats (Q[1-4] 20\d{2}) Snapshot", text)
+    if not period:
+        raise ValueError("The Backblaze page format changed; the latest quarter could not be identified.")
+    quarter = period.group(1)
+
+    def metric(pattern: str, label: str) -> int:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            raise ValueError(f"The Backblaze snapshot did not include {label}.")
+        return int(match.group(1).replace(",", ""))
+
+    drive_count = metric(r"Drive count\s+([\d,]+)", "drive count")
+    drive_failures = metric(r"Drive failures\s+([\d,]+)", "drive failures")
+    drive_days = metric(r"Drive days\s+([\d,]+)", "drive days")
+    row = re.search(
+        rf"{re.escape(quarter)}\s+(?:{re.escape(quarter)}\s+)?([\d,]+)\s+(?:[\d,]+\s+)?([\d,]+)\s+(?:[\d,]+\s+)?([\d.]+%)",
+        text,
+    )
+    if not row:
+        raise ValueError(f"The Backblaze page did not include the {quarter} reliability row.")
+    return {
+        "quarter": quarter,
+        "drive_count": drive_count,
+        "drive_failures": drive_failures,
+        "drive_days": drive_days,
+        "quarter_afr": row.group(3),
+    }
+
+
 def icon_header(icon: str, title: str, subtitle: str = "") -> None:
     st.markdown(
         f'<div class="section-head"><span class="section-icon">{icon}</span>'
@@ -186,7 +246,7 @@ anomaly = load_json(str(ANOMALY_PATH)) if ANOMALY_PATH.exists() else None
 # Sidebar: clear scope, filters, and a short legend.
 with st.sidebar:
     st.markdown("<div class='hero-kicker'>DRIVEGUARD / HISTORICAL LAB</div>", unsafe_allow_html=True)
-    st.markdown("### Explore the test period")
+    st.markdown("### Explore the dashboard")
     dates = predictions["obs_date"].dt.date
     min_date, max_date = min(dates), max(dates)
     selected_dates = st.date_input("Observation dates", value=(min_date, max_date), min_value=min_date, max_value=max_date)
@@ -198,24 +258,25 @@ with st.sidebar:
     selected_model = st.selectbox("Drive model", model_options)
     st.markdown("---")
     st.markdown("**How to read risk**")
-    st.caption("The XGBoost score ranks historical drive-days. It is not a live reading or a promise of failure.")
+    st.caption("The XGBoost score ranks 2013 historical drive-days. It is not a live reading or a promise of failure.")
     st.markdown("<span class='mono' style='color:#ffc36b'>──</span> Validation-selected reference threshold", unsafe_allow_html=True)
     st.caption(f"Reference threshold: {validation_threshold:.3f} · validation FPR target ≤ 1%")
     st.markdown("---")
-    st.caption("Data: Backblaze 2013 · held-out dates: 2013-10-15 to 2013-12-01 · horizon: 30 days")
-    st.caption("This app is a retrospective research demo, not a production alerting service.")
+    st.caption("Model: Backblaze 2013 · held-out dates: 2013-10-15 to 2013-12-01 · horizon: 30 days")
+    st.caption("Latest public fleet snapshot is shown separately and updates when Backblaze publishes it.")
+    st.caption("This app is a research demo, not a live drive monitor or production alerting service.")
 
 st.markdown(
     "<div class='hero'><div class='hero-kicker'>PREDICTIVE MAINTENANCE · RESEARCH EDITION</div>"
     "<div class='hero-title'>DriveGuard <span style='color:#55d6d0'>Fleet intelligence</span></div>"
     "<div class='hero-sub'>Explore how historical SMART telemetry ranked drive-days ahead of recorded failures."
-    " Every view is grounded in a chronological holdout, with the alert trade-off and data limits made visible.</div>"
-    "<div class='hero-pill'><span class='pulse'></span> RETROSPECTIVE · NOT CONNECTED TO LIVE DRIVES</div></div>",
+    " The historical model and the latest public fleet snapshot are separated so their dates and limits stay clear.</div>"
+    "<div class='hero-pill'><span class='pulse'></span> HISTORICAL MODEL · PUBLIC FLEET SNAPSHOT</div></div>",
     unsafe_allow_html=True,
 )
 
-tab_overview, tab_risk, tab_drive, tab_models, tab_explain, tab_quality = st.tabs([
-    "✦  Fleet overview", "⌁  Risk explorer", "◉  Drive detail", "▥  Model lab", "✧  Why this score", "◎  Data quality",
+tab_overview, tab_live, tab_risk, tab_drive, tab_models, tab_explain, tab_quality = st.tabs([
+    "✦  Fleet overview", "↻  Latest fleet data", "⌁  Risk explorer", "◉  Drive detail", "▥  Model lab", "✧  Why this score", "◎  Data quality",
 ])
 
 with tab_overview:
@@ -251,6 +312,32 @@ with tab_overview:
 
     with st.expander("What does average precision mean?"):
         st.write("Average precision summarizes precision across recall levels. It is useful for rare events because it focuses on how well positive cases are ranked. The test prevalence is the no-skill reference (about 0.005 here); average precision is not the same as accuracy or a calibrated probability.")
+
+with tab_live:
+    icon_header("↻", "Latest public Backblaze fleet snapshot", "Current published aggregate · separate from the 2013 model")
+    st.markdown(
+        "This view reads Backblaze’s latest published Drive Stats snapshot. Backblaze records SMART telemetry daily, "
+        "but publishes the public dataset in quarterly releases, so this is **the latest published fleet snapshot, "
+        "not a real-time feed and not data from your own drives**."
+    )
+    try:
+        snapshot = load_latest_backblaze_snapshot()
+        st.caption(f"Published period: **{snapshot['quarter']}** · source checked on this app session · cached for up to 6 hours")
+        live_a, live_b, live_c, live_d = st.columns(4)
+        live_a.metric("Drives in snapshot", f"{snapshot['drive_count']:,}")
+        live_b.metric("Recorded failures", f"{snapshot['drive_failures']:,}")
+        live_c.metric("Drive-days", f"{snapshot['drive_days']:,}")
+        live_d.metric("Quarterly annualized failure rate", snapshot["quarter_afr"])
+        insight(
+            "<strong>How to read this:</strong> the annualized failure rate is a population-level historical summary. "
+            "It is not a probability that a particular drive will fail, and it is not comparable to DriveGuard’s "
+            "30-day row-level test metrics. The model below remains trained and evaluated on 2013 data."
+        )
+    except Exception as exc:
+        st.warning("The latest public snapshot could not be fetched right now. The historical 2013 dashboard remains available.")
+        st.caption(f"Refresh later; upstream response: {type(exc).__name__}")
+    st.markdown(f"[Open Backblaze’s official Drive Stats page ↗]({BACKBLAZE_STATS_URL})")
+    st.caption("The dashboard checks the official page on first load and caches the result for six hours. New values appear after Backblaze publishes an updated snapshot.")
 
 with tab_risk:
     icon_header("⌁", "Historical risk explorer", "Complete-test operating view")
