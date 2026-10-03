@@ -57,12 +57,22 @@ The source contains a sharp population drop from **2013-08-20 through 2013-10-14
 The model is a retrospective study of 2013 data. The dashboard also retrieves Backblaze's latest published fleet snapshot (quarterly, not real time); it does not connect to your own drives. It has seven views:
 
 1. **Fleet overview** — population, labels, model status, and headline operating metrics.
-2. **Latest fleet data** — current published Backblaze aggregate counts and quarterly AFR, clearly separated from model results.
+2. **Latest fleet data** — actual drive-level SMART rows from the latest published Backblaze quarter, with model/status filters, key attributes, and CSV export. These records are separate from the 2013 model results.
 3. **Risk explorer** — filter and inspect ranked drive-day observations.
 4. **Drive detail** — review a drive's history and score trajectory.
 5. **Model lab** — compare the baselines and their alert trade-offs.
 6. **Why this score** — global and local feature explanations.
 7. **Data quality** — calibration, uncertainty, and error-slice context.
+
+To load drive-level records from the latest published quarter, add Backblaze's public read-only Iceberg credentials in Streamlit Community Cloud under **Manage app → Settings → Secrets**:
+
+```toml
+[backblaze]
+key_id = "<Backblaze public read-only key ID>"
+application_key = "<Backblaze public read-only application key>"
+```
+
+Backblaze documents the credentials and dataset details on its [Drive Stats page](https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data). The Streamlit app does not store or expose these values in GitHub.
 
 After installing the app dependencies and generating or obtaining the saved artifacts described below, run:
 

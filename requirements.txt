@@ -1,4 +1,4 @@
-duckdb>=1.1,<2
+duckdb>=1.5,<2
 pandas>=2.2,<4
 pyarrow>=18,<25
 scikit-learn>=1.5,<2

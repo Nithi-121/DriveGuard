@@ -14,6 +14,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+import duckdb
+from datetime import date, timedelta
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +26,7 @@ SAMPLE_PATH = REPORTS / "model_evaluation" / "test_predictions_sample.parquet"
 ANOMALY_PATH = REPORTS / "model_evaluation" / "isolation_forest_metrics.json"
 EXPLAIN_PATH = REPORTS / "explainability"
 BACKBLAZE_STATS_URL = "https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data"
+BACKBLAZE_ICEBERG_URI = "s3://drivestats-iceberg/drivestats"
 
 st.set_page_config(
     page_title="DriveGuard | Fleet intelligence",
@@ -173,6 +176,68 @@ def load_latest_backblaze_snapshot() -> dict:
     }
 
 
+@st.cache_data(ttl=6 * 60 * 60, show_spinner=False)
+def load_latest_backblaze_records(quarter: str) -> tuple[pd.DataFrame, date]:
+    """Query the final daily drive-level snapshot in Backblaze's latest quarter."""
+    match = re.fullmatch(r"Q([1-4]) (20\d{2})", quarter)
+    if not match:
+        raise ValueError(f"Unexpected Backblaze quarter: {quarter}")
+    quarter_number, year = int(match.group(1)), int(match.group(2))
+    month = (quarter_number - 1) * 3 + 1
+    start = date(year, month, 1)
+    end = date(year + 1, 1, 1) if month == 10 else date(year, month + 3, 1)
+    credentials = st.secrets.get("backblaze", {})
+    key_id = credentials.get("key_id")
+    application_key = credentials.get("application_key")
+    if not key_id or not application_key:
+        raise ValueError("Backblaze read-only credentials are not configured in Streamlit app secrets.")
+
+    connection = duckdb.connect()
+    try:
+        connection.execute("INSTALL httpfs")
+        connection.execute("LOAD httpfs")
+        connection.execute("INSTALL iceberg")
+        connection.execute("LOAD iceberg")
+        connection.execute("SET unsafe_enable_version_guessing = true")
+        connection.execute(
+            """CREATE SECRET backblaze_public_read (
+                TYPE s3,
+                KEY_ID ?,
+                SECRET ?,
+                REGION 'us-west-004',
+                ENDPOINT 's3.us-west-004.backblazeb2.com'
+            )""",
+            [key_id, application_key],
+        )
+        source = "iceberg_scan(?, version='?', allow_moved_paths=true)"
+        latest_date = end - timedelta(days=1)
+
+        columns = [
+            "date", "serial_number", "model", "capacity_bytes", "failure",
+            "smart_5_raw", "smart_9_raw", "smart_187_raw", "smart_188_raw",
+            "smart_194_raw", "smart_197_raw", "smart_198_raw",
+        ]
+        frame = connection.execute(
+            f"SELECT {', '.join(columns)} FROM {source} WHERE date = ?",
+            [BACKBLAZE_ICEBERG_URI, latest_date],
+        ).fetchdf()
+        if frame.empty:
+            latest_date = connection.execute(
+                f"SELECT MAX(date) FROM {source} WHERE date >= ? AND date < ?",
+                [BACKBLAZE_ICEBERG_URI, start, end],
+            ).fetchone()[0]
+            if latest_date is None:
+                raise ValueError(f"No Backblaze daily records were found for {quarter}.")
+            frame = connection.execute(
+                f"SELECT {', '.join(columns)} FROM {source} WHERE date = ?",
+                [BACKBLAZE_ICEBERG_URI, latest_date],
+            ).fetchdf()
+        frame["failure"] = frame["failure"].fillna(0).astype(bool)
+        return frame, latest_date
+    finally:
+        connection.close()
+
+
 def icon_header(icon: str, title: str, subtitle: str = "") -> None:
     st.markdown(
         f'<div class="section-head"><span class="section-icon">{icon}</span>'
@@ -314,30 +379,96 @@ with tab_overview:
         st.write("Average precision summarizes precision across recall levels. It is useful for rare events because it focuses on how well positive cases are ranked. The test prevalence is the no-skill reference (about 0.005 here); average precision is not the same as accuracy or a calibrated probability.")
 
 with tab_live:
-    icon_header("↻", "Latest public Backblaze fleet snapshot", "Current published aggregate · separate from the 2013 model")
+    icon_header("↻", "Latest drive-level snapshot", "Latest published quarter · actual public SMART rows")
     st.markdown(
-        "This view reads Backblaze’s latest published Drive Stats snapshot. Backblaze records SMART telemetry daily, "
-        "but publishes the public dataset in quarterly releases, so this is **the latest published fleet snapshot, "
-        "not a real-time feed and not data from your own drives**."
+        "This view loads individual daily SMART records from Backblaze’s latest published quarter. "
+        "Backblaze publishes the data in quarterly releases, so it is **not real time "
+        "and does not represent drives connected to your own computer**."
     )
     try:
         snapshot = load_latest_backblaze_snapshot()
-        st.caption(f"Published period: **{snapshot['quarter']}** · source checked on this app session · cached for up to 6 hours")
+        with st.spinner(f"Querying the {snapshot['quarter']} public drive records…"):
+            current_drives, observed_date = load_latest_backblaze_records(snapshot["quarter"])
+        st.caption(f"Published quarter: **{snapshot['quarter']}** · latest daily snapshot: **{observed_date:%B %d, %Y}** · cached for up to 6 hours")
         live_a, live_b, live_c, live_d = st.columns(4)
-        live_a.metric("Drives in snapshot", f"{snapshot['drive_count']:,}")
-        live_b.metric("Recorded failures", f"{snapshot['drive_failures']:,}")
-        live_c.metric("Drive-days", f"{snapshot['drive_days']:,}")
-        live_d.metric("Quarterly annualized failure rate", snapshot["quarter_afr"])
+        live_a.metric("Drive records that day", f"{len(current_drives):,}")
+        live_b.metric("Failures recorded that day", f"{int(current_drives['failure'].sum()):,}")
+        live_c.metric("Drive models", f"{current_drives['model'].nunique():,}")
+        live_d.metric("Quarterly AFR", snapshot["quarter_afr"], help="Backblaze's aggregate annualized failure rate for the published quarter; not an individual-drive probability.")
+
+        current_drives["capacity_tb"] = current_drives["capacity_bytes"] / 1_000_000_000_000
+        top_models = (
+            current_drives.groupby("model", dropna=False)
+            .agg(drive_records=("serial_number", "size"), failures=("failure", "sum"))
+            .nlargest(12, "drive_records")
+            .sort_values("drive_records")
+            .reset_index()
+        )
+        left, right = st.columns([1.15, 1])
+        with left:
+            model_fig = px.bar(
+                top_models, x="drive_records", y="model", orientation="h", color="failures",
+                color_continuous_scale=["#55d6d0", "#ff7b86"],
+                title=f"Most represented drive models · {observed_date:%Y-%m-%d}",
+                labels={"drive_records": "Drive records", "model": "Drive model", "failures": "Failures"},
+            )
+            st.plotly_chart(style_plot(model_fig, 390), use_container_width=True)
+        with right:
+            st.markdown("#### Browse the actual 2026 rows")
+            model_choices = ["All models"] + sorted(current_drives["model"].dropna().astype(str).unique())
+            chosen_live_model = st.selectbox("Drive model", model_choices, key="live_model")
+            failure_choice = st.selectbox("Snapshot status", ["All records", "Failure recorded", "No failure recorded"], key="live_failure")
+            serial_search = st.text_input("Find a serial number", key="live_serial").strip()
+            live_rows = current_drives.copy()
+            if chosen_live_model != "All models":
+                live_rows = live_rows[live_rows["model"].astype(str).eq(chosen_live_model)]
+            if failure_choice == "Failure recorded":
+                live_rows = live_rows[live_rows["failure"].eq(1)]
+            elif failure_choice == "No failure recorded":
+                live_rows = live_rows[live_rows["failure"].eq(0)]
+            if serial_search:
+                live_rows = live_rows[live_rows["serial_number"].astype(str).str.contains(serial_search, case=False, na=False, regex=False)]
+            st.caption(f"{len(live_rows):,} matching records · these are the complete daily rows for the displayed snapshot.")
+
+        display_columns = {
+            "date": "Snapshot date", "serial_number": "Serial number", "model": "Drive model",
+            "capacity_tb": "Capacity (TB)", "failure": "Failure recorded",
+            "smart_5_raw": "Reallocated sectors · SMART 5", "smart_9_raw": "Power-on hours · SMART 9",
+            "smart_187_raw": "Reported uncorrectable · SMART 187", "smart_188_raw": "Command timeout · SMART 188",
+            "smart_194_raw": "Temperature · SMART 194", "smart_197_raw": "Pending sectors · SMART 197",
+            "smart_198_raw": "Uncorrectable sectors · SMART 198",
+        }
+        shown = live_rows.sort_values(["failure", "smart_5_raw"], ascending=[False, False], na_position="last")
+        st.dataframe(
+            shown[list(display_columns)].rename(columns=display_columns).head(500),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Snapshot date": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                "Capacity (TB)": st.column_config.NumberColumn(format="%.2f TB"),
+                "Failure recorded": st.column_config.CheckboxColumn(),
+            },
+        )
+        st.download_button(
+            "Download first 10,000 matching records as CSV",
+            data=shown[list(display_columns)].rename(columns=display_columns).head(10_000).to_csv(index=False).encode("utf-8"),
+            file_name=f"driveguard_backblaze_{observed_date:%Y%m%d}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
         insight(
-            "<strong>How to read this:</strong> the annualized failure rate is a population-level historical summary. "
-            "It is not a probability that a particular drive will fail, and it is not comparable to DriveGuard’s "
-            "30-day row-level test metrics. The model below remains trained and evaluated on 2013 data."
+            "<strong>Model boundary:</strong> these 2026 rows are not scored by the 2013 XGBoost model. "
+            "The SMART fields are raw vendor-reported values and can mean different things across drive models. "
+            "A failure flag records an outcome on that day; it is not a prediction."
         )
     except Exception as exc:
-        st.warning("The latest public snapshot could not be fetched right now. The historical 2013 dashboard remains available.")
-        st.caption(f"Refresh later; upstream response: {type(exc).__name__}")
+        st.error("The latest per-drive snapshot could not be loaded. The historical model dashboard remains available.")
+        if "not configured in Streamlit app secrets" in str(exc):
+            st.info("To enable the 2026 drive rows, add Backblaze's public read-only Iceberg credentials in Streamlit Cloud → Manage app → Settings → Secrets. See the README for the required TOML fields.")
+        else:
+            st.caption(f"Backblaze source request failed ({type(exc).__name__}). Try again after the source is reachable.")
     st.markdown(f"[Open Backblaze’s official Drive Stats page ↗]({BACKBLAZE_STATS_URL})")
-    st.caption("The dashboard checks the official page on first load and caches the result for six hours. New values appear after Backblaze publishes an updated snapshot.")
+    st.caption("The dashboard reads Backblaze's public read-only Iceberg table and refreshes its cached data every six hours. New snapshot dates appear after Backblaze publishes a quarterly update.")
 
 with tab_risk:
     icon_header("⌁", "Historical risk explorer", "Complete-test operating view")

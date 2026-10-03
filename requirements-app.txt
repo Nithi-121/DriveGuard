@@ -1,2 +1,3 @@
 streamlit>=1.40,<2
 plotly>=5.24,<7
+duckdb>=1.5,<2
