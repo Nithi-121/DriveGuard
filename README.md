@@ -64,7 +64,7 @@ The model is a retrospective study of 2013 data. The dashboard also retrieves Ba
 6. **Why this score** — global and local feature explanations.
 7. **Data quality** — calibration, uncertainty, and error-slice context.
 
-The latest-fleet view reads the last daily CSV from Backblaze's public quarterly ZIP archive using HTTP byte-range requests, so it fetches only that compressed day rather than unpacking the multi-gigabyte quarter. The latest daily rows are not scored by the 2013 model. See [Backblaze Drive Stats](https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data) for source and release cadence.
+The latest-fleet view starts with Backblaze's published quarterly summary. Select **Load latest daily drive records** when you want to browse the actual SMART rows; the app reads only that day's compressed CSV through HTTP byte-range requests instead of unpacking the multi-gigabyte quarter. It caches loaded rows for six hours. The latest daily rows are not scored by the 2013 model. See [Backblaze Drive Stats](https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data) for source and release cadence.
 
 After installing the app dependencies and generating or obtaining the saved artifacts described below, run:
 

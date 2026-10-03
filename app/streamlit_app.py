@@ -138,7 +138,7 @@ class _PageText(HTMLParser):
 class _HttpRangeReader(io.RawIOBase):
     """Seekable view of a public ZIP archive, fetching only requested byte ranges."""
 
-    def __init__(self, url: str, *, block_size: int = 1 << 20, cached_blocks: int = 8) -> None:
+    def __init__(self, url: str, *, block_size: int = 8 << 20, cached_blocks: int = 4) -> None:
         super().__init__()
         self.url = url
         self.position = 0
@@ -255,7 +255,7 @@ def load_latest_backblaze_snapshot() -> dict:
 
 
 @st.cache_data(ttl=6 * 60 * 60, show_spinner=False)
-def load_latest_backblaze_records(quarter: str) -> tuple[pd.DataFrame, date]:
+def load_latest_backblaze_records(quarter: str) -> tuple[pd.DataFrame, date, int]:
     """Read the final CSV entry of Backblaze's quarterly ZIP using HTTP range requests."""
     match = re.fullmatch(r"Q([1-4]) (20\d{2})", quarter)
     if not match:
@@ -278,11 +278,12 @@ def load_latest_backblaze_records(quarter: str) -> tuple[pd.DataFrame, date]:
             raise ValueError(f"No daily CSV files were found in the {quarter} archive.")
         member = members[-1]
         latest_date = date.fromisoformat(Path(member).stem)
+        compressed_bytes = archive.getinfo(member).compress_size
         with archive.open(member) as csv_file:
             frame = pd.read_csv(csv_file, usecols=columns)
     frame["date"] = pd.to_datetime(frame["date"])
     frame["failure"] = frame["failure"].fillna(0).astype(bool)
-    return frame, latest_date
+    return frame, latest_date, compressed_bytes
 
 
 def icon_header(icon: str, title: str, subtitle: str = "") -> None:
@@ -428,86 +429,91 @@ with tab_overview:
 with tab_live:
     icon_header("↻", "Latest drive-level snapshot", "Latest published quarter · actual public SMART rows")
     st.markdown(
-        "This view loads individual daily SMART records from Backblaze’s latest published quarter. "
+        "This view can load individual daily SMART records from Backblaze’s latest published quarter. "
         "Backblaze publishes the data in quarterly releases, so it is **not real time "
         "and does not represent drives connected to your own computer**."
     )
     try:
         snapshot = load_latest_backblaze_snapshot()
-        with st.spinner(f"Querying the {snapshot['quarter']} public drive records…"):
-            current_drives, observed_date = load_latest_backblaze_records(snapshot["quarter"])
-        st.caption(f"Published quarter: **{snapshot['quarter']}** · latest daily snapshot: **{observed_date:%B %d, %Y}** · cached for up to 6 hours")
+        st.caption(f"Latest published period: **{snapshot['quarter']}** · source: Backblaze Drive Stats")
         live_a, live_b, live_c, live_d = st.columns(4)
-        live_a.metric("Drive records that day", f"{len(current_drives):,}")
-        live_b.metric("Failures recorded that day", f"{int(current_drives['failure'].sum()):,}")
-        live_c.metric("Drive models", f"{current_drives['model'].nunique():,}")
+        live_a.metric("Drives in published snapshot", f"{snapshot['drive_count']:,}")
+        live_b.metric("Failures in published quarter", f"{snapshot['drive_failures']:,}")
+        live_c.metric("Drive-days in quarter", f"{snapshot['drive_days']:,}")
         live_d.metric("Quarterly AFR", snapshot["quarter_afr"], help="Backblaze's aggregate annualized failure rate for the published quarter; not an individual-drive probability.")
-
-        current_drives["capacity_tb"] = current_drives["capacity_bytes"] / 1_000_000_000_000
-        top_models = (
-            current_drives.groupby("model", dropna=False)
-            .agg(drive_records=("serial_number", "size"), failures=("failure", "sum"))
-            .nlargest(12, "drive_records")
-            .sort_values("drive_records")
-            .reset_index()
-        )
-        left, right = st.columns([1.15, 1])
-        with left:
-            model_fig = px.bar(
-                top_models, x="drive_records", y="model", orientation="h", color="failures",
-                color_continuous_scale=["#55d6d0", "#ff7b86"],
-                title=f"Most represented drive models · {observed_date:%Y-%m-%d}",
-                labels={"drive_records": "Drive records", "model": "Drive model", "failures": "Failures"},
+        if st.button("Load latest daily drive records", type="primary", key="load_backblaze_rows"):
+            st.session_state["backblaze_rows_requested"] = True
+        if st.session_state.get("backblaze_rows_requested", False):
+            with st.spinner("Fetching the latest daily CSV from Backblaze…"):
+                current_drives, observed_date, compressed_bytes = load_latest_backblaze_records(snapshot["quarter"])
+            st.caption(f"Latest daily snapshot: **{observed_date:%B %d, %Y}** · downloaded one compressed file ({compressed_bytes / 1_000_000:.1f} MB) · cached for up to 6 hours")
+            current_drives["capacity_tb"] = current_drives["capacity_bytes"] / 1_000_000_000_000
+            top_models = (
+                current_drives.groupby("model", dropna=False)
+                .agg(drive_records=("serial_number", "size"), failures=("failure", "sum"))
+                .nlargest(12, "drive_records")
+                .sort_values("drive_records")
+                .reset_index()
             )
-            st.plotly_chart(style_plot(model_fig, 390), use_container_width=True)
-        with right:
-            st.markdown("#### Browse the actual 2026 rows")
-            model_choices = ["All models"] + sorted(current_drives["model"].dropna().astype(str).unique())
-            chosen_live_model = st.selectbox("Drive model", model_choices, key="live_model")
-            failure_choice = st.selectbox("Snapshot status", ["All records", "Failure recorded", "No failure recorded"], key="live_failure")
-            serial_search = st.text_input("Find a serial number", key="live_serial").strip()
-            live_rows = current_drives.copy()
-            if chosen_live_model != "All models":
-                live_rows = live_rows[live_rows["model"].astype(str).eq(chosen_live_model)]
-            if failure_choice == "Failure recorded":
-                live_rows = live_rows[live_rows["failure"].eq(1)]
-            elif failure_choice == "No failure recorded":
-                live_rows = live_rows[live_rows["failure"].eq(0)]
-            if serial_search:
-                live_rows = live_rows[live_rows["serial_number"].astype(str).str.contains(serial_search, case=False, na=False, regex=False)]
-            st.caption(f"{len(live_rows):,} matching records · these are the complete daily rows for the displayed snapshot.")
+            left, right = st.columns([1.15, 1])
+            with left:
+                model_fig = px.bar(
+                    top_models, x="drive_records", y="model", orientation="h", color="failures",
+                    color_continuous_scale=["#55d6d0", "#ff7b86"],
+                    title=f"Most represented drive models · {observed_date:%Y-%m-%d}",
+                    labels={"drive_records": "Drive records", "model": "Drive model", "failures": "Failures"},
+                )
+                st.plotly_chart(style_plot(model_fig, 390), use_container_width=True)
+            with right:
+                st.markdown("#### Browse the actual drive rows")
+                model_choices = ["All models"] + sorted(current_drives["model"].dropna().astype(str).unique())
+                chosen_live_model = st.selectbox("Drive model", model_choices, key="live_model")
+                failure_choice = st.selectbox("Snapshot status", ["All records", "Failure recorded", "No failure recorded"], key="live_failure")
+                serial_search = st.text_input("Find a serial number", key="live_serial").strip()
+                live_rows = current_drives.copy()
+                if chosen_live_model != "All models":
+                    live_rows = live_rows[live_rows["model"].astype(str).eq(chosen_live_model)]
+                if failure_choice == "Failure recorded":
+                    live_rows = live_rows[live_rows["failure"].eq(1)]
+                elif failure_choice == "No failure recorded":
+                    live_rows = live_rows[live_rows["failure"].eq(0)]
+                if serial_search:
+                    live_rows = live_rows[live_rows["serial_number"].astype(str).str.contains(serial_search, case=False, na=False, regex=False)]
+                st.caption(f"{len(live_rows):,} matching records · full daily data for the displayed snapshot.")
 
-        display_columns = {
-            "date": "Snapshot date", "serial_number": "Serial number", "model": "Drive model",
-            "capacity_tb": "Capacity (TB)", "failure": "Failure recorded",
-            "smart_5_raw": "Reallocated sectors · SMART 5", "smart_9_raw": "Power-on hours · SMART 9",
-            "smart_187_raw": "Reported uncorrectable · SMART 187", "smart_188_raw": "Command timeout · SMART 188",
-            "smart_194_raw": "Temperature · SMART 194", "smart_197_raw": "Pending sectors · SMART 197",
-            "smart_198_raw": "Uncorrectable sectors · SMART 198",
-        }
-        shown = live_rows.sort_values(["failure", "smart_5_raw"], ascending=[False, False], na_position="last")
-        st.dataframe(
-            shown[list(display_columns)].rename(columns=display_columns).head(500),
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Snapshot date": st.column_config.DateColumn(format="YYYY-MM-DD"),
-                "Capacity (TB)": st.column_config.NumberColumn(format="%.2f TB"),
-                "Failure recorded": st.column_config.CheckboxColumn(),
-            },
-        )
-        st.download_button(
-            "Download first 10,000 matching records as CSV",
-            data=shown[list(display_columns)].rename(columns=display_columns).head(10_000).to_csv(index=False).encode("utf-8"),
-            file_name=f"driveguard_backblaze_{observed_date:%Y%m%d}.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-        insight(
-            "<strong>Model boundary:</strong> these 2026 rows are not scored by the 2013 XGBoost model. "
-            "The SMART fields are raw vendor-reported values and can mean different things across drive models. "
-            "A failure flag records an outcome on that day; it is not a prediction."
-        )
+            display_columns = {
+                "date": "Snapshot date", "serial_number": "Serial number", "model": "Drive model",
+                "capacity_tb": "Capacity (TB)", "failure": "Failure recorded",
+                "smart_5_raw": "Reallocated sectors · SMART 5", "smart_9_raw": "Power-on hours · SMART 9",
+                "smart_187_raw": "Reported uncorrectable · SMART 187", "smart_188_raw": "Command timeout · SMART 188",
+                "smart_194_raw": "Temperature · SMART 194", "smart_197_raw": "Pending sectors · SMART 197",
+                "smart_198_raw": "Uncorrectable sectors · SMART 198",
+            }
+            shown = live_rows.sort_values(["failure", "smart_5_raw"], ascending=[False, False], na_position="last")
+            st.dataframe(
+                shown[list(display_columns)].rename(columns=display_columns).head(500),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Snapshot date": st.column_config.DateColumn(format="YYYY-MM-DD"),
+                    "Capacity (TB)": st.column_config.NumberColumn(format="%.2f TB"),
+                    "Failure recorded": st.column_config.CheckboxColumn(),
+                },
+            )
+            st.download_button(
+                "Download first 10,000 matching records as CSV",
+                data=shown[list(display_columns)].rename(columns=display_columns).head(10_000).to_csv(index=False).encode("utf-8"),
+                file_name=f"driveguard_backblaze_{observed_date:%Y%m%d}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+            insight(
+                "<strong>Model boundary:</strong> these newer rows are not scored by the 2013 XGBoost model. "
+                "The SMART fields are raw vendor-reported values and can mean different things across drive models. "
+                "A failure flag records an outcome on that day; it is not a prediction."
+            )
+        else:
+            st.info("The 2026 quarterly summary is above. Select **Load latest daily drive records** to fetch and browse the actual per-drive SMART rows. The first load takes longer; later reruns use a six-hour cache.")
     except Exception as exc:
         st.error("The latest per-drive snapshot could not be loaded. The historical model dashboard remains available.")
         st.caption(f"Backblaze source request failed ({type(exc).__name__}). Try again after the source is reachable.")
